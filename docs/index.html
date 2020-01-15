@@ -1,0 +1,218 @@
+<html>
+
+	<head>
+
+		<title>XSLT by example</title>
+
+		<script>
+
+			function get (id) {
+				return document.getElementById (id)
+			}
+
+			function parse (xml) {
+
+				return (new window.DOMParser ()).parseFromString (xml, "text/xml")
+
+			}
+
+			function createProcessor () {
+
+		        var p = new XSLTProcessor (); p.importStylesheet (parse (get ('xsl').innerText.trim ()))
+
+		        return p
+
+			}
+
+			function process () {
+
+				processFile (createProcessor (), get ('file').files [0])
+
+			}
+
+			function processFile (processor, file) {
+
+				var reader = new FileReader ()
+
+				reader.onload = function () {
+
+			        var s = (new XMLSerializer ())
+
+			        	.serializeToString (processor.transformToDocument (parse (reader.result)))
+
+			        	.replace (
+			        		'xmlns="http://www.w3.org/1999/XSL/Transform"',
+			        		'xmlns="http://www.w3.org/1999/XSL/Transform" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"'
+			        	)
+
+			        if (s.substr (0, 5) != '<?xml') s = '<?xml version="1.0" encoding="UTF-8"?>\n' + s
+
+			        s.saveAs (file.name.replace ('.xml', '.xsl'))
+
+			    }
+
+				reader.readAsText (file)
+
+			}
+
+			Blob.prototype.saveAs = function (name) {
+
+				var url = window.URL.createObjectURL (this)
+
+				var a = document.createElement ("a")
+
+				a.style    = "display: none"
+				a.href     = url
+				a.download = name
+
+				document.body.appendChild (a)
+
+				a.click ()
+
+				window.URL.revokeObjectURL (url)
+
+				a.outerHTML = ''
+
+			}
+
+			String.prototype.saveAs = function (name, type) {
+
+				if (!type) type = 'application/octet-stream'
+
+				new Blob ([this], {type: type}).saveAs (name)
+
+			}
+
+		</script>
+
+		<script id=xsl type="application/xslt+xml">
+
+			<?xml version="1.0"?>
+			<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+
+			  <xsl:output method="xml" version="1.0" encoding="UTF-8" indent="yes" />
+
+			  <xsl:template match="processing-instruction()" mode="x">
+				<xsl:element name="processing-instruction" namespace="http://www.w3.org/1999/XSL/Transform">
+				  <xsl:attribute name="name"><xsl:value-of select="name()"/></xsl:attribute>
+				  <xsl:value-of select="."/>
+				</xsl:element>
+			  </xsl:template>
+
+			  <xsl:template match="text()" mode="x">
+				<xsl:copy-of select="." />
+			  </xsl:template>
+
+			  <xsl:template match="@*" mode="x">
+				<xsl:choose>
+				  <xsl:when test="starts-with(., '{')">
+					<xsl:element name="attribute" namespace="http://www.w3.org/1999/XSL/Transform">
+					  <xsl:attribute name="name"><xsl:value-of select="name(.)" /></xsl:attribute>
+					  <xsl:value-of select="." />
+					</xsl:element>
+				  </xsl:when>
+				  <xsl:otherwise>
+					<xsl:copy-of select="." />
+				  </xsl:otherwise>
+				</xsl:choose>
+			  </xsl:template>
+
+			  <xsl:template match="*" mode="x">
+				<xsl:copy>
+				  <xsl:apply-templates select="processing-instruction()|text()|@*|*" mode="x" />
+				</xsl:copy>
+			  </xsl:template>
+
+			  <xsl:template match="/">
+
+				<xsl:element name="stylesheet" namespace="http://www.w3.org/1999/XSL/Transform">
+				  <xsl:attribute name="version">1.0</xsl:attribute>
+
+				  <xsl:element name="output" namespace="http://www.w3.org/1999/XSL/Transform">
+					<xsl:attribute name="encoding">UTF-8</xsl:attribute>
+					<xsl:attribute name="indent">yes</xsl:attribute>
+				  </xsl:element>
+
+				  <xsl:element name="template" namespace="http://www.w3.org/1999/XSL/Transform">
+					<xsl:attribute name="match">/</xsl:attribute>
+					<xsl:apply-templates select="." mode="x" />
+				  </xsl:element>
+
+				</xsl:element>
+
+			  </xsl:template>
+
+			</xsl:stylesheet>
+
+		</script>
+
+	</head>
+
+	<style>
+
+		body {
+			font-family: Sans-Serif;
+			margin: 3em 4em 3em 10em;
+		}
+
+		pre {
+			font-size: 10px;
+			color: ccc;
+		}
+
+	</style>
+
+	<body>
+
+		<h1>XSLT by example</h1>
+
+		<p>This HTML page lets you translate a given XML file into pretty printed <a href="https://www.w3.org/TR/1999/REC-xslt-19991116" target=_blank>XSLT</a> code.</p>
+
+		<p>The resulting XSLT, when applied to any well formed XML source, yields the original XML.</p>
+
+		<p>The mechanism is intended to produce XSLT templates based on their expected output: for example, <a href="http://officeopenxml.com/" target=_blank>Office Open XML files</a>.</p>
+
+		<p>It is presumed that the generated (initial) XSLT code is to be altered by replacing variative fragments with data binding elements like <code>xsl:value-of</code>, <code>xsl:for-each</code> and so on.</p>
+
+		<p>The <code>xsl:</code> prefix for the <code>http://www.w3.org/1999/XSL/Transform</code> namespace is always available. Others are to be added manually when needed.</p>
+
+		<p>All processing is done in browser using <a href="https://developer.mozilla.org/en-US/docs/Web/API/File" target=_blank>File</a> and <a href="https://developer.mozilla.org/en-US/docs/Web/API/XSLTProcessor" target=_blank>XSLTProcessor</a> APIs. No server interaction of any kind is in effect. No javaScript libraries nor other assets are injected.</p>
+
+		<p>You can save this page locally and use it by opening from your hard drive.</p>
+
+		<hr>
+
+		<input id=file type=file accept=".xml" onChange="process ()">
+
+		<hr>
+
+		<pre>
+
+Copyright (c) 2020, Dmitry Ovsyanko
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+		</pre>
+
+	</body>
+
+</html>
